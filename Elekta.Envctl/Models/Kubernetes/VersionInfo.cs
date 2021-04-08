@@ -4,6 +4,7 @@ namespace Elekta.Envctl.Models.Kubernetes
 {
     public class VersionInfo
     {
+        public string FullVersion => $"{Major}.{Minor}";
         public int Major { get; set; }
         public int Minor { get; set; }
         public string GitVersion { get; set; }

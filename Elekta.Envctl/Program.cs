@@ -1,4 +1,4 @@
-﻿using Elekta.Envctl.Models.Docker;
+﻿using Elekta.Envctl.Converters;
 using Elekta.Envctl.Models.Helm;
 using System;
 using System.Diagnostics;
@@ -19,8 +19,11 @@ namespace Elekta.Envctl
         {
             var docker = GetStdOutForProcess("docker", "version");
             Console.WriteLine(docker);
-            Console.WriteLine(GetStdOutForProcess("kubectl", "version"));
-
+            var k8s = GetStdOutForProcess("kubectl", "version");
+            //Console.WriteLine(k8s);
+            var info = new StringReader(k8s).DeserialiseKubernetesVersion();
+            Console.WriteLine($"Client Version: {info.Client.FullVersion}");
+            Console.WriteLine($"Server Version: {info.Server.FullVersion}");
             GetChartVersions();
 
             Console.ReadLine();
