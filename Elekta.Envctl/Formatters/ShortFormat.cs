@@ -1,20 +1,27 @@
 ﻿using Elekta.Envctl.Models;
 using System.Text;
 
-namespace Elekta.Envctl
+namespace Elekta.Envctl.Formatter
 {
-    public static class ShortFormatExtention
+    public class ShortFormat : IFormat
     {
-        public static string ToShortFormat(this OutputModel model)
+        public string Format(OutputModel model)
         {
             var builder = new StringBuilder();
             builder.AppendLine("==== Kubernetes ====");
             builder.Append("Client:\t");
-            builder.AppendLine(model.KubernetesVersion.Client.FullVersion);
+            builder.AppendLine(model.KubernetesVersion.Client?.FullVersion ?? "--- Failed to get Data ---");
             builder.Append("Server:\t");
             builder.AppendLine(model.KubernetesVersion.Server?.FullVersion ?? "--- Failed to get Data ---");
 
             builder.AppendLine();
+
+            if (model.KubernetesVersion.HasErrors)
+            {
+                builder.Append("Errors:\t");
+                builder.AppendLine(model.KubernetesVersion.Errors);
+                builder.AppendLine();
+            }
 
             builder.AppendLine("==== Helm Charts ====");
             foreach (var helmChart in model.HelmCharts)

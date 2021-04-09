@@ -1,20 +1,21 @@
-﻿using System;
-using System.IO;
+﻿using Elekta.Envctl.Models;
+using Elekta.Envctl.Models.Docker;
 
 namespace Elekta.Envctl.Converters
 {
-    public static class DirtyDockerVersionConverter
+    public class DirtyDockerVersionSerialiser : ISerialiser<DockerVersion>
     {
-        public static T DockerVersionDeserialise<T>(this TextReader stream)
+        public DockerVersion Deserialise(ProcessOutput output)
         {
-            Type type = typeof(T);
+            return new DockerVersion();
+            /*Type type = typeof(T);
             var obj = Activator.CreateInstance(type);
             string line;
             while ((line = stream.ReadLine()) != null)
             {
                 Console.WriteLine(line);
             }
-            /*foreach (var line in stream. File.ReadLines(fileName))
+            foreach (var line in stream. File.ReadLines(fileName))
             {
                 var keyVal = line.Split('=');
                 if (keyVal.Length != 2) continue;
@@ -24,8 +25,8 @@ namespace Elekta.Envctl.Converters
                 {
                     prop.SetValue(obj, Convert.ChangeType(keyVal[1], prop.PropertyType));
                 }
-            }*/
-            return (T)obj;
+            }
+            return (T)obj;*/
         }
     }
 }

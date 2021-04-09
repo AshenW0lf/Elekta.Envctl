@@ -1,11 +1,15 @@
 ﻿using Elekta.Envctl.Converters;
+using Elekta.Envctl.Formatter;
 using Elekta.Envctl.Models;
+using Elekta.Envctl.Models.Docker;
 using Elekta.Envctl.Models.Helm;
+using Elekta.Envctl.Models.Kubernetes;
 using System;
 using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
+using System.Threading.Tasks;
 using YamlDotNet.RepresentationModel;
 using YamlDotNet.Serialization;
 using YamlDotNet.Serialization.NamingConventions;
@@ -17,60 +21,85 @@ namespace Elekta.Envctl
         const string rootPath = "C:\\Elekta\\elekta-platform-sdk";
         const string elementsPath = "scripts\\devctl.d\\elekta-platform-elements";
 
-        static void Main(string[] args)
+        static async Task<int> Main(string[] args)
         {
-            var docker = GetStdOutForProcess("docker", "version");
-            Console.WriteLine(docker);
-            
-            var output = new OutputModel();
-            
-            var k8s = GetStdOutForProcess("kubectl", "version");
-            output.KubernetesVersion = new StringReader(k8s).DeserialiseKubernetesVersion();
-            output.HelmCharts = GetChartVersions();
+            var output = new OutputModel(new ShortFormat());
+            var tasks = new List<Task>
+            {
+                GetOutputForProcessAsync("docker", "version")
+                    .ToObject<DockerVersion, DirtyDockerVersionSerialiser>()
+                    .UpdateAsync(output),
+                GetOutputForProcessAsync("kubectl", "version")
+                    .ToObject<KubernetesVersion, KubernetesVersionSerialiser>()
+                    .UpdateAsync(output),
+                GetChartVersionsAsync().UpdateAsync(output)
+            };
+
+            await output.UpdateAsync(tasks);
 
             Console.WriteLine(output);
             Console.ReadLine();
+            return 0;
         }
 
-        private static string GetStdOutForProcess(string fileName, string arguments)
+        private static async Task<ProcessOutput> GetOutputForProcessAsync(string fileName, string arguments)
         {
-            var result = new StringBuilder();
-            using (var process = new Process())
+            return await Task.Run(() =>
             {
-                process.StartInfo = new ProcessStartInfo(fileName, arguments)
+                var output = new ProcessOutput();
+                var stdout = new StringBuilder();
+                var stderr = new StringBuilder();
+                try
                 {
-                    RedirectStandardOutput = true,
-                    UseShellExecute = false
-                };
+                    using var process = new Process
+                    {
+                        StartInfo = new ProcessStartInfo(fileName, arguments)
+                        {
+                            RedirectStandardOutput = true,
+                            RedirectStandardError = true,
+                            UseShellExecute = false
+                        }
+                    };
 
-                process.Start();
-                while (!process.HasExited)
-                {
-                    result.Append(process.StandardOutput.ReadToEnd());
+                    process.Start();
+                    while (!process.HasExited)
+                    {
+                        stdout.Append(process.StandardOutput.ReadToEnd());
+                        stderr.Append(process.StandardError.ReadToEnd());
+                    }
+                    output.Data = stdout.ToString();
+                    output.Error = stderr.ToString();
                 }
-            }
-            return result.ToString();
+                catch (Exception ex)
+                {
+                    output.Error += " " + ex.Message;
+                }
+                return output;
+            });
         }
 
-        private static IList<HelmChart> GetChartVersions()
+        private static async Task<IList<HelmChart>> GetChartVersionsAsync()
         {
-            var path = Path.Combine(rootPath, elementsPath);
-            var charts = new List<HelmChart>();
-
-            foreach (var file in Directory.GetFiles(path,"*.yaml"))
+            return await Task.Run(() =>
             {
-                var yaml = new YamlStream();
-                using var fs = new FileStream(file, FileMode.Open, FileAccess.Read);
-                using var sr = new StreamReader(fs, Encoding.UTF8);
+                var path = Path.Combine(rootPath, elementsPath);
+                var charts = new List<HelmChart>();
 
-                var deserializer = new DeserializerBuilder()
-                    .WithNamingConvention(CamelCaseNamingConvention.Instance)
-                    .Build();
+                foreach (var file in Directory.GetFiles(path, "*.yaml"))
+                {
+                    var yaml = new YamlStream();
+                    using var fs = new FileStream(file, FileMode.Open, FileAccess.Read);
+                    using var sr = new StreamReader(fs, Encoding.UTF8);
 
-                charts.Add(deserializer.Deserialize<HelmChart>(sr));
-            }
+                    var deserializer = new DeserializerBuilder()
+                        .WithNamingConvention(CamelCaseNamingConvention.Instance)
+                        .Build();
 
-            return charts;
+                    charts.Add(deserializer.Deserialize<HelmChart>(sr));
+                }
+
+                return charts;
+            });
         }
     }
 }
