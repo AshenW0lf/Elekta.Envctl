@@ -1,6 +1,8 @@
 ﻿using Elekta.Envctl.Converters;
+using Elekta.Envctl.Models;
 using Elekta.Envctl.Models.Helm;
 using System;
+using System.Collections.Generic;
 using System.Diagnostics;
 using System.IO;
 using System.Text;
@@ -19,13 +21,14 @@ namespace Elekta.Envctl
         {
             var docker = GetStdOutForProcess("docker", "version");
             Console.WriteLine(docker);
+            
+            var output = new OutputModel();
+            
             var k8s = GetStdOutForProcess("kubectl", "version");
-            //Console.WriteLine(k8s);
-            var info = new StringReader(k8s).DeserialiseKubernetesVersion();
-            Console.WriteLine($"Client Version: {info.Client.FullVersion}");
-            Console.WriteLine($"Server Version: {info.Server.FullVersion}");
-            GetChartVersions();
+            output.KubernetesVersion = new StringReader(k8s).DeserialiseKubernetesVersion();
+            output.HelmCharts = GetChartVersions();
 
+            Console.WriteLine(output);
             Console.ReadLine();
         }
 
@@ -49,9 +52,10 @@ namespace Elekta.Envctl
             return result.ToString();
         }
 
-        private static string GetChartVersions()
+        private static IList<HelmChart> GetChartVersions()
         {
             var path = Path.Combine(rootPath, elementsPath);
+            var charts = new List<HelmChart>();
 
             foreach (var file in Directory.GetFiles(path,"*.yaml"))
             {
@@ -62,14 +66,11 @@ namespace Elekta.Envctl
                 var deserializer = new DeserializerBuilder()
                     .WithNamingConvention(CamelCaseNamingConvention.Instance)
                     .Build();
-                var order = deserializer.Deserialize<HelmChart>(sr);
-                
-                Console.WriteLine($"Name: {order.Spec.Chart.Name}");
-                Console.WriteLine($"Version: {order.Spec.Chart.Version}");
-                Console.WriteLine();
+
+                charts.Add(deserializer.Deserialize<HelmChart>(sr));
             }
 
-            return string.Empty;
+            return charts;
         }
     }
 }
